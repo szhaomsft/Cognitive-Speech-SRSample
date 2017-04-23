@@ -1,6 +1,6 @@
 # Cognitive-Speech-SRSample
 This repo keeps some community contributed samples to use Cognitive SR services.
-It is provided AS IT IS without any additional WARRANTY. 
+It is provided "AS IS" and WITHOUT WARRANTY
 
 # License
 
