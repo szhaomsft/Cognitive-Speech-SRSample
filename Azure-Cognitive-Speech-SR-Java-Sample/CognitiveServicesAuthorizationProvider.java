@@ -31,8 +31,7 @@ public class CognitiveServicesAuthorizationProvider implements IAuthorizationPro
     	
 		try {
 			HttpClient httpclient = HttpClients.createDefault();
-			String url = "https://api.cognitive.microsoft.com/sts/v1.0/issueToken";
-			HttpPost authRequest = new HttpPost(url);
+			HttpPost authRequest = new HttpPost(fetchTokenUri);
 			authRequest.addHeader("Content-type", "application/x-www-form-urlencoded");
 			authRequest.addHeader("Ocp-Apim-Subscription-Key", subscriptionKey);
 			HttpResponse authResponse = httpclient.execute(authRequest);
