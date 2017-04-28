@@ -5,6 +5,8 @@ import java.net.URI;
 import java.util.Scanner;
 
 import com.microsoft.bing.speech.Preferences;
+import com.microsoft.bing.speech.RecognitionPartialResult;
+import com.microsoft.bing.speech.RecognitionResult;
 import com.microsoft.bing.speech.SpeechClient;
 import com.microsoft.bing.speech.SpeechInput;
 
@@ -18,9 +20,17 @@ public class BingSpeechJavaSDKSample {
 		    Preferences preferences = new Preferences(speechLanguage, uri, authorizationProvider, true);
 		    SpeechClient speechClient = new SpeechClient(preferences);
 		    
-		    //Register the event handler to handle recognition results or errors
-		    speechClient.subscribeToRecognitionResult((rr) -> {
-		    	System.out.println(new String(rr.phrases.get(0).displayText));
+		    //Register the event handler to handle partial recognition result or error
+		    speechClient.subscribeToRecognitionPartialResult((rbr) -> {
+		    	System.out.println("--- Partial result ---");
+		    	System.out.println(new String(((RecognitionPartialResult)rbr).displayText));
+		    	System.out.println();
+		    });
+		    //Register the event handler to handle recognition result or error
+		    speechClient.subscribeToRecognitionResult((rbr) -> {
+		    	System.out.println();
+		    	System.out.println("--- Recognition Phrase result ---");
+		    	System.out.println(new String(((RecognitionResult)rbr).phrases.get(0).displayText));
 		    });
 		    
 		    FileInputStream fis = new FileInputStream("whatstheweatherlike.wav");
