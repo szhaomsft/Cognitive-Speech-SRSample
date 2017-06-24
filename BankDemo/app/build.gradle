@@ -1,9 +1,24 @@
 apply plugin: 'com.android.application'
 
+repositories {
+    maven {
+        name = 'Maven Central Repo' //optional name
+        url = 'http://repo1.maven.org/maven2/'
+    }
+
+    flatDir {
+        dirs 'libs'
+    }
+}
+
 android {
-    useLibrary 'org.apache.http.legacy'
-    compileSdkVersion 25
-    buildToolsVersion "25.0.2"
+    compileSdkVersion rootProject.ext.compileSdkVersion
+    buildToolsVersion rootProject.ext.buildToolsVersion
+
+    sourceSets.main {
+        jniLibs.srcDir 'src/main/libs'
+    }
+
     defaultConfig {
         applicationId "com.microsoft.speech.bankdemo"
         minSdkVersion 16
@@ -18,10 +33,9 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
-    repositories {
-        flatDir {
-            dirs 'libs'
-        }
+
+    lintOptions {
+        abortOnError false
     }
 }
 
@@ -35,5 +49,5 @@ dependencies {
     compile 'org.apache.httpcomponents:httpclient-android:4.3.5.1'
     testCompile 'junit:junit:4.12'
     compile(name: 'ttsclientsdk', ext: 'aar')
-    compile(name: 'srclientsdk', ext: 'aar')
+    compile 'com.microsoft.projectoxford:speechrecognition:1.2.2'
 }
