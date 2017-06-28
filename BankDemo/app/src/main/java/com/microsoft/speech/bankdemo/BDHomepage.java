@@ -1,6 +1,8 @@
 package com.microsoft.speech.bankdemo;
 
+import android.content.DialogInterface;
 import android.content.Intent;
+import android.graphics.Color;
 import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.AudioTrack;
@@ -11,6 +13,7 @@ import android.os.Message;
 import android.os.Bundle;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
+import android.text.method.ScrollingMovementMethod;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.EditText;
@@ -35,7 +38,9 @@ public class BDHomepage extends AppCompatActivity implements ISpeechRecognitionS
     private ImageButton accountinfoButton;
     private ImageButton paymentButton;
     private ImageButton billButton;
-    private EditText talkLable;
+    private TextView peopleTalkLable;
+    private TextView bankTalkLable;
+    private SiriView siriView;
 
     private MicrophoneRecognitionClient micClient = null;
 
@@ -51,7 +56,8 @@ public class BDHomepage extends AppCompatActivity implements ISpeechRecognitionS
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_bdhomepage);
 
-        talkLable = (EditText)findViewById(R.id.talkLable);
+        peopleTalkLable = (TextView)findViewById(R.id.peopleTalkLable);
+        bankTalkLable = (TextView)findViewById(R.id.bankTalkLable);
         talkButton = (ImageButton)findViewById(R.id.talkButton);
         transferButton = (ImageButton)findViewById(R.id.transferButton);
         accountinfoButton = (ImageButton)findViewById(R.id.accountButton);
@@ -71,16 +77,36 @@ public class BDHomepage extends AppCompatActivity implements ISpeechRecognitionS
         initSynthesizer();
         initSR();
 
+        siriView = (SiriView) findViewById(R.id.siriView);
+        // Stop the wave curve
+        siriView.stop();
+        // Set the height of the curve, height value is 0f ~ 1f
+        //siriView.setWaveHeight(0.5f);
+        // Set the thickness of the curve, width value greater than 0f
+        siriView.setWaveWidth(5f);
+        // Set the curve color
+        siriView.setWaveColor(Color.rgb(39, 188, 136));
+        // Sets the offset of the curve on the X axis. The default value is 0f
+        siriView.setWaveOffsetX(0f);
+        // Set the number of curves, the default is 4
+        siriView.setWaveAmount(4);
+        // Set the speed of the curve, the default is 0.1f
+        siriView.setWaveSpeed(0.1f);
+
         talkButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 if(isRecoding){
                     isRecoding = false;
-                    talkLable.setText("");
+                    peopleTalkLable.setText("");
+                    bankTalkLable.setText("");
+                    siriView.stop();
                     micClient.endMicAndRecognition();
                 }else{
+                    m_syn.MSTTS_Stop(handle);
                     isRecoding = true;
-                    talkLable.setText("");
+                    peopleTalkLable.setText("");
+                    bankTalkLable.setText("");
                     micClient.startMicAndRecognition();
                 }
             }
@@ -154,7 +180,7 @@ public class BDHomepage extends AppCompatActivity implements ISpeechRecognitionS
         handle = m_syn.MSTTS_CreateSpeechSynthesizerHandler(handle, getResources().getString(R.string.primaryKey));
 
         if(handle == -1){
-            talkLable.setText("initialization failed.");
+            bankTalkLable.setText("initialization failed.");
             result = -1;
         }
 
@@ -185,15 +211,17 @@ public class BDHomepage extends AppCompatActivity implements ISpeechRecognitionS
     public void onFinalResponseReceived(final RecognitionResult response) {
         if(isRecoding){
             isRecoding = false;
+            siriView.stop();
             this.micClient.endMicAndRecognition();
 
             if(response.Results.length > 0) {
-                talkLable.setText(response.Results[0].DisplayText);
+                peopleTalkLable.setText(response.Results[0].DisplayText.replace("。", ""));
             }
 
-            String data = talkLable.getText().toString().trim();
+            String data = peopleTalkLable.getText().toString().trim();
             if((data.indexOf("多少") != -1) || (data.indexOf("查询") != -1) || (data.indexOf("余额") != -1)){
                 AccountInfoDialog();
+                bankTalkLable.setText("您的账户余额为：1458485.45元");
                 AsyncTask.execute(new Runnable() {
                     @Override
                     public void run() {
@@ -202,20 +230,32 @@ public class BDHomepage extends AppCompatActivity implements ISpeechRecognitionS
                     }
                 });
             }else if((data.indexOf("转账") != -1) || (data.indexOf("转帐") != -1)){
-                TransferDialog(data);
-                AsyncTask.execute(new Runnable() {
-                    @Override
-                    public void run() {
-                        m_syn.MSTTS_SetOutput(handle, null, m_syn);
-                        m_syn.MSTTS_Speak(handle, "已填好您的转账请求，请确认", 0);
-                    }
-                });
+                if(TransferDialog(data)){
+                    bankTalkLable.setText("已填好您的转账请求，请确认");
+                    AsyncTask.execute(new Runnable() {
+                        @Override
+                        public void run() {
+                            m_syn.MSTTS_SetOutput(handle, null, m_syn);
+                            m_syn.MSTTS_Speak(handle, "已填好您的转账请求，请确认", 0);
+                        }
+                    });
+                }else{
+                    bankTalkLable.setText("转账信息无法确定，请完善");
+                    AsyncTask.execute(new Runnable() {
+                        @Override
+                        public void run() {
+                            m_syn.MSTTS_SetOutput(handle, null, m_syn);
+                            m_syn.MSTTS_Speak(handle, "转账信息无法确定，请完善", 0);
+                        }
+                    });
+                }
             }else{
+                bankTalkLable.setText("我不明白你在说什么");
                 AsyncTask.execute(new Runnable() {
                     @Override
                     public void run() {
                         m_syn.MSTTS_SetOutput(handle, null, m_syn);
-                        m_syn.MSTTS_Speak(handle, "对不起，我不知道你在说什么", 0);
+                        m_syn.MSTTS_Speak(handle, "我不明白你在说什么", 0);
                     }
                 });
             }
@@ -223,23 +263,26 @@ public class BDHomepage extends AppCompatActivity implements ISpeechRecognitionS
     }
 
     public void onPartialResponseReceived(final String response) {
-        talkLable.setText(response);
+        peopleTalkLable.setText(response);
     }
 
     public void onIntentReceived(final String payload) {
-        talkLable.setText(payload);
+        peopleTalkLable.setText(payload);
     }
 
     public void onError(final int errorCode, final String response) {
-        talkLable.setText("Error code: " + SpeechClientStatus.fromInt(errorCode) + " " + errorCode + "\r\nError text: " + response);
+        bankTalkLable.setText("Error code: " + SpeechClientStatus.fromInt(errorCode) + " " + errorCode + "\r\nError text: " + response);
     }
 
     public void onAudioEvent(boolean recording) {
         if (recording) {
-            talkLable.setText("Please start speaking.");
+            // Set the height of the curve, height value is 0f ~ 1f
+            siriView.setWaveHeight(0.5f);
+            //bankTalkLable.setText("Please start speaking.");
         }
 
         if (!recording) {
+            siriView.stop();
             this.micClient.endMicAndRecognition();
         }
     }
@@ -248,39 +291,73 @@ public class BDHomepage extends AppCompatActivity implements ISpeechRecognitionS
     //region interface design
     public void AccountInfoDialog(){
         new  AlertDialog.Builder(this)
+                .setCancelable(false)
                 .setTitle("账户余额" )
                 .setMessage("您的账户余额为：1458485.45元" )
-                .setPositiveButton("确定" ,  null )
+                .setPositiveButton("确定" ,  new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int i) {
+                        m_syn.MSTTS_Stop(handle);
+                    }
+                })
                 .show();
     }
 
-    public void TransferDialog (String data) {
+    public boolean TransferDialog (String data) {
         LayoutInflater layoutInflater = LayoutInflater.from(this);
         View trsndgrtDialogView = layoutInflater.inflate(R.layout.transfer, null);
+        boolean result = true;
+        long Transfer;
 
         EditText mUserName = (EditText)trsndgrtDialogView.findViewById(R.id.edit_username);
-        EditText mPassword = (EditText)trsndgrtDialogView.findViewById(R.id.edit_password);
+        EditText mTransfer = (EditText)trsndgrtDialogView.findViewById(R.id.edit_password);
 
         String[] name = data.split("给|转帐");
 
         if(name.length > 2){
             mUserName.setText(name[1]);
-            mPassword.setText(String.valueOf(NumberFormatUtil.convert(name[2])));
+            Transfer = NumberFormatUtil.convert(name[2]);
+            if(Transfer > 0){
+                mTransfer.setText(String.valueOf(Transfer));
+            }else{
+                result = false;
+            }
         }else{
             name = data.split("给|转账");
             if(name.length > 2){
                 mUserName.setText(name[1]);
-                mPassword.setText(String.valueOf(NumberFormatUtil.convert(name[2])));
+                Transfer = NumberFormatUtil.convert(name[2]);
+                if(Transfer > 0){
+                    mTransfer.setText(String.valueOf(Transfer));
+                }else{
+                    result = false;
+                }
+            }else{
+                result = false;
             }
         }
 
         AlertDialog longinDialog = new AlertDialog.Builder(this)
+                .setCancelable(false)
                 .setTitle("转账")
                 .setView(trsndgrtDialogView)
-                .setPositiveButton("确定", null)
-                .setNeutralButton("取消", null)
+                .setPositiveButton("确定", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int i) {
+                        Toast.makeText(getApplicationContext(), "转帐成功", Toast.LENGTH_SHORT).show();
+                        m_syn.MSTTS_Stop(handle);
+                    }
+                })
+                .setNeutralButton("取消", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int i) {
+                        m_syn.MSTTS_Stop(handle);
+                    }
+                })
                 .create();
         longinDialog.show();
+
+        return result;
     }
     //endregion
 }
