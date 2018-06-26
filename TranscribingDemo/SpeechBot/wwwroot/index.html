@@ -1,0 +1,48 @@
+﻿<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Chat bot</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="description" content="">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.1.0/css/all.css" integrity="sha384-lKuwvrZot6UHsBSfcMvOkWwlCMgc0TaWr+30HWe3a4ltaBwTZhyTEggF5tJv8tbt" crossorigin="anonymous">
+    <link rel="stylesheet" href="css/speech-bot.css">
+</head>
+
+<body onload="onPageLoad();">
+    <script src="assets/aria-web-telemetry-2.8.2.min.js">
+    </script>
+    <script type="text/javascript">
+        function onPageLoad() {
+            // Initialize
+            microsoft.applications.telemetry.LogManager.initialize("210337d8ece64ba48966b43a7fe9b710-6b4c86f6-b729-4113-b916-afaed02d732c-7338");
+
+            // Store the logger instance in a variable that is accessible in other methods of your page
+            window.ariaLogger = new microsoft.applications.telemetry.Logger();
+            ariaLogger.logEvent({
+                name: "Visit",
+                properties: {
+                    "page": {
+                        value: "index",
+                        pii: microsoft.applications.telemetry.datamodels.PIIKind.GenericData
+                    }
+                }
+            });
+        }
+    </script>
+    <div id="app">Loading</div>
+    <table id="debug-table">
+        <thead>
+            <tr>
+                <th>Delta(ms)</th>
+                <th>Debug Message</th>
+            </tr>
+        </thead>
+        <tbody id="debug"></tbody>
+    </table>
+    <script type="text/javascript" src="assets/app.js"></script>
+</body>
+
+</html>

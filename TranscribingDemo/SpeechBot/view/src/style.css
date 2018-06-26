@@ -1,0 +1,28 @@
+.response-text {
+    font-size: 20px;
+    animation: all 250ms;
+    text-align: center;
+    color: #005a9e;
+}
+
+.assitant-bar {
+    display: flex;
+}
+
+.assitant-bar > input[type=text] {
+    flex-grow: 1;
+    height: 50px;
+    background-color: #eee;
+    border: none;
+    padding-left: 20px;
+    padding-right: 20px;
+    border-top: 1px solid #d6d6d6;
+    font-size: 16px;
+}
+
+.assitant-bar > input[type=submit], .assitant-bar > button {
+    width: 70px;
+    border: none;
+    cursor: pointer;
+    font-size: 24px;
+}
