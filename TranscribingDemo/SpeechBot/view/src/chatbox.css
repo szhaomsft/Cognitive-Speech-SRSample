@@ -1,0 +1,115 @@
+body {
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.6;
+}
+
+.message .avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 2px;
+    -moz-border-radius: 2px;
+    -webkit-border-radius: 2px;
+}
+
+.message.sender-bot .avatar {
+    float: left;
+}
+
+.message.sender-user .avatar {
+    float: right;
+}
+
+.message.sender-bot .text {
+    background-color: #fff;
+}
+
+.message.sender-user {
+    text-align: right;
+}
+
+.message.sender-user .text {
+    background-color: #b2e281;
+}
+
+.message.sender-bot .text:before {
+    position: relative;
+    border: 6px solid transparent;
+    content: "";
+    border-right-color: #fff;
+    border-right-width: 4px;
+    left: -23px;
+    float: left;
+    margin-right: -10px;
+}
+
+.message.sender-user .text:after {
+    position: relative;
+    border: 6px solid transparent;
+    content: "";
+    border-left-color: #b2e281;
+    border-left-width: 4px;
+    right: -23px;
+    float: right;
+    margin-left: -10px;
+}
+
+.message .text {
+    position: relative;
+    padding: 9px 13px;
+    margin: 0 20px 20px 20px;
+    display: inline-block;
+    border-radius: 3px;
+    max-width: 400px;
+}
+
+.conversation-box {
+    background-color: #eee;
+    max-width: 800px;
+    margin: auto;
+}
+
+.message-box {
+    padding: 0 20px;
+}
+
+h1 {
+    text-align: center;
+}
+
+#debug-table {
+    width: 100%;
+    max-width: 800px;
+    margin: auto;
+}
+
+#debug-table tr:nth-child(even) {
+    background-color: #f2f2f2;
+}
+
+#debug-table td {
+    padding: 0 20px;
+}
+
+#debug-table td:first-child {
+    text-align: right;
+}
+
+#debug-table th {
+    padding-top: 11px;
+    padding-bottom: 11px;
+    background-color: #4CAF50;
+    color: white;
+}
+
+.settings-box {
+    margin: auto;
+    max-width: 800px;
+}
+
+.settings-box table {
+    width: 100%;
+}
+
+.settings-box input, .settings-box select {
+    width: 100%;
+}
