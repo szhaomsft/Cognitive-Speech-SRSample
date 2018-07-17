@@ -21,7 +21,6 @@ namespace SpeechBot.WebPortal
         /// <summary>
         /// communication timeout timer, refresh on final cognitive results or tts request received, close websocket when time out.
         /// </summary>
-        private readonly System.Timers.Timer _connTimeoutTimer = new System.Timers.Timer(60 * 1000);
 
         public string lastestGuess = "";
 
@@ -39,13 +38,9 @@ namespace SpeechBot.WebPortal
             this.config = config;
             Console.WriteLine("New Behavior Obj.");
             timer.Stop();
-//            timer.Elapsed += (sender, e) => Stop().Wait();
             timer.AutoReset = false;
             timer.Interval = 10000;
             timer.Start();
-            _connTimeoutTimer.Elapsed += (sender, e) => CloseWebSocket();
-            _connTimeoutTimer.AutoReset = false;
-            _connTimeoutTimer.Start();
             this.DoQuery = doQuery;
             _OnMessage = onMessage;
             this.StartSRClient(); 
@@ -163,8 +158,6 @@ namespace SpeechBot.WebPortal
                 }
                 else if (text.StartsWith("[tts]"))
                 {
-                    _connTimeoutTimer.Stop();
-                    _connTimeoutTimer.Start();
                     string ttsText = text.Substring(5);
                     var tts = new TTSClient(OnTTSData, () => { Console.WriteLine("TTS End"); });
                     var sentences = ttsText.Split(new char[] { ';', '。', '？', '?' });
@@ -210,8 +203,6 @@ namespace SpeechBot.WebPortal
                 }
                 if (type == UnifiedSpeechServicesSTT.WebSocketMessageType.FinalResult) // && !SREnded)
                 {
-                    _connTimeoutTimer.Stop();
-                    _connTimeoutTimer.Start();
                     Console.WriteLine("Phrase: " + responseText);
                     lastestGuess = responseText;
                     timer.Stop();
