@@ -177,7 +177,7 @@ namespace SpeechBot.WebPortal
 ""key"": ""{tulingKey}"",
   ""info"": ""{query}"",
   ""loc"": ""北京市中关村"",
-  ""userid"": ""felixh123""
+  ""userid"": ""Your Tuling ID""
 }}";
             var botstream = httpWebRequest.GetRequestStream();
             var writeBuf = Encoding.UTF8.GetBytes(json);
