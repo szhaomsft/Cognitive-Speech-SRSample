@@ -138,8 +138,6 @@ export default class AssistantInput extends React.Component {
       }
     };
 
-    // Create VAD
-    this.vad = new VAD(options);
     this.audioSource.oninactive = () => {
       navigator.getUserMedia({
         audio: true
