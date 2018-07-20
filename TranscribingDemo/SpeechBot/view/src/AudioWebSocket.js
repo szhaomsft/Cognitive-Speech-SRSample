@@ -17,7 +17,7 @@ function connect(cb, wsServicePath = 'speech' , config = {}) {
   try {
     let wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     if (!websocket || websocket.readyState !== websocket.OPEN) {
-      var uri = `${wsProtocol}//${window.location.hostname}${window.location.port ? ':' + window.location.port : ''}/${wsServicePath}`;
+      var uri = `${wsProtocol}//${window.location.host}${window.location.pathname.substring(0,location.href.lastIndexOf('/'))}${wsServicePath}`;
       if (window.location.search.indexOf('mooncakesr') >= 0) {
         uri = `${wsProtocol}//${window.location.hostname}${window.location.port ? ':' + window.location.port : ''}/sr`;
       }
@@ -130,16 +130,18 @@ export default {
       websocket.send(mes)
     }
     else if (websocket && websocket.readyState === websocket.CONNECTING) {
-      buffer.push(mes)
+      buffer.push(mes);
+      console.log("buffer pushed: " + mes);
     }
     else {
+      buffer.push(mes);
       connect(() => {
         console.log('WS opened ' + performance.now());
         l_open_cb();
         while (buffer.length > 0) {
+          console.log("sending buffer: " + buffer[0]);
           websocket.send(buffer.shift())
         }
-        l_audio_recoder.record(websocket);
       }, l_ws_service_path, l_config);
 
       websocket.onerror = function (event) {

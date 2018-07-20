@@ -206,7 +206,7 @@ class App extends React.Component {
                        Api Region
                      </td>
                      <td>
-                       <select id='unified-region' defaultValue='westus'>
+                       <select id='unified-region' defaultValue='eastasia'>
                          {apiRegions.map(locale => <option key={locale} value={locale}>
                            {locale}
                          </option>)}
@@ -247,7 +247,7 @@ class App extends React.Component {
                <div className='message-box'>
                  {history.map(({sender, text}, i) => {
                     return <div key={i} className={'message ' + 'sender-' + sender}>
-                             <img className='avatar' src={sender === 'bot' ? '/imgs/marvin.jpg' : '/imgs/beeblebrox.jpg'} />
+                             <img className='avatar' src={sender === 'bot' ? 'imgs/marvin.jpg' : 'imgs/beeblebrox.jpg'} />
                              <div className='text'>
                                {text}
                              </div>

@@ -31,7 +31,6 @@ namespace UnifiedSpeechServicesSTT
         private SpeechFactory _factory;
         private SpeechRecognizer _recognizer;
         public SRClientStatus Status { get; private set; }
-        private Timer _timer;
         private SendMessageAction _sendMessage;
         private Action _onClose;
         private readonly int _id;
@@ -53,13 +52,12 @@ namespace UnifiedSpeechServicesSTT
             _audioInputStreamFormat.FormatTag = 1;
             _audioInputStreamFormat.BitsPerSample = 16;
             _audioInputStreamFormat.BlockAlign = 2;
-            _interMemoryStream = new ProducerConsumerStream(8*1000);
+            _interMemoryStream = new ProducerConsumerStream(8 * 1000);
             _binaryAudioStreamReader = new BinaryAudioStreamReader(_audioInputStreamFormat, _interMemoryStream);
             this._subscriptionKey = subscriptionKey;
             this._region = region;
             this._locale = locale;
             this.CreateFactory();
-//            this.CreateRecognizer();
         }
 
         private void CreateFactory()
@@ -79,7 +77,7 @@ namespace UnifiedSpeechServicesSTT
         private void CreateRecognizer()
         {
             // direct input from mic, for test only
-//            this.recognizer = this.factory.CreateSpeechRecognizer(this.locale);
+            //            this.recognizer = this.factory.CreateSpeechRecognizer(this.locale);
             // input from stream
             this._recognizer = this._factory.CreateSpeechRecognizerWithStream(_binaryAudioStreamReader, _locale);
         }
@@ -89,20 +87,7 @@ namespace UnifiedSpeechServicesSTT
             var status = this.Status;
             this.Close();
             this.CreateFactory();
-//            this.CreateRecognizer();
             this.StartRecognition(status == SRClientStatus.WorkingAlways);
-//            if (status == SRClientStatus.WorkingAlways)
-//            {
-//                Console.WriteLine("Creating continous recognizer");
-//                this._recognizer.StartContinuousRecognitionAsync();
-//                this.Status = SRClientStatus.WorkingAlways;
-//            }
-//            else if (status == SRClientStatus.WorkingOnce)
-//            {
-//                Console.WriteLine("Creating single recognizer");
-//                this._recognizer.RecognizeAsync();
-//                this.Status = SRClientStatus.WorkingOnce;
-//            }
         }
 
         public void WriteLine(string s)
@@ -125,14 +110,12 @@ namespace UnifiedSpeechServicesSTT
         {
             if (Status == SRClientStatus.WorkingOnce || Status == SRClientStatus.WorkingAlways)
             {
-                // this.dataClient.SendAudio(buffer, bytesRead);
                 this._interMemoryStream.WriteAsync(buffer, 0, bytesRead);
             }
         }
 
         public void EndAudio()
         {
-//            this.CloseEverything();
         }
 
         public void DoSR(string subscriptionKey, SendMessageAction onResult, Action onClose, string locale, string endpoint = null, string region = "westus")
@@ -147,13 +130,16 @@ namespace UnifiedSpeechServicesSTT
 
         public void Close()
         {
-            this.StopRecognition();
+            this.StopRecognition().ConfigureAwait(false);
             // dispose recognizer
             try
             {
                 this._recognizer.Dispose();
             }
-            catch (Exception e) { }
+            catch (Exception)
+            {
+                // ignored
+            }
         }
 
         /// <summary>
@@ -162,44 +148,48 @@ namespace UnifiedSpeechServicesSTT
         /// <param name="continuous">boolean, indicate if it is a continous task</param>
         public void StartRecognition(bool continuous = false)
         {
-//            this._interMemoryStream.Clear();
-            // connect handlers
-            
-
             if (this.Status != SRClientStatus.Idle)
             {
-                this.StopRecognition();
+                this.StopRecognition().ConfigureAwait(false);
                 Console.WriteLine("Warning: new recognition starts before last one ends.");
             }
 
+            _interMemoryStream.Reset();
+
             this.CreateRecognizer();
 
+            // connect handlers
             this._recognizer.IntermediateResultReceived += this.OnIntermediatedResultReceived;
             this._recognizer.FinalResultReceived += this.OnFinalResultReceivedHandler;
             this._recognizer.OnSessionEvent += OnSessionEventHandler;
             this._recognizer.RecognitionErrorRaised += this.OnErrorHandler;
 
-            
+
             // starts recognition
             if (continuous)
             {
-                Console.WriteLine("Creating continous recongnizer");
+                Console.WriteLine("Creating continuous recognizer");
                 this._recognizer.StartContinuousRecognitionAsync();
                 this.Status = SRClientStatus.WorkingAlways;
             }
             else
             {
-                Console.WriteLine("Creating sigle recongnizer");
+                Console.WriteLine("Creating single recognizer");
                 this._recognizer.RecognizeAsync();
                 this.Status = SRClientStatus.WorkingOnce;
             }
         }
 
-        public void StopRecognition()
+        public async Task StopRecognition()
         {
-            // change state
-            this.Status = SRClientStatus.Idle;
-            // delete handers
+            this._interMemoryStream.CompleteAdding();
+            // stop continuous recognition
+            if (this.Status == SRClientStatus.WorkingAlways)
+            {
+                await this.StopContinuousRecognition();
+            }
+
+            // delete handlers
             try
             {
                 this._recognizer.IntermediateResultReceived -= this.OnIntermediatedResultReceived;
@@ -207,19 +197,20 @@ namespace UnifiedSpeechServicesSTT
                 this._recognizer.OnSessionEvent -= OnSessionEventHandler;
                 this._recognizer.RecognitionErrorRaised -= this.OnErrorHandler;
             }
-            catch (Exception e) { }
-            // stop continuous recognition
-            if (this.Status == SRClientStatus.WorkingAlways)
+            catch (Exception)
             {
-                this.StopContinuousRecognition();
+                // ignored
             }
+            // change state
+            this.Status = SRClientStatus.Idle;
+
             this._recognizer?.Dispose();
         }
 
-        public void StopContinuousRecognition()
+        public async Task StopContinuousRecognition()
         {
             this.Status = SRClientStatus.Idle;
-            this._recognizer.StopContinuousRecognitionAsync().Wait();
+            await this._recognizer.StopContinuousRecognitionAsync();
         }
 
         private void OnIntermediatedResultReceived(object sender, SpeechRecognitionResultEventArgs e)
@@ -237,16 +228,17 @@ namespace UnifiedSpeechServicesSTT
                 {
                     this.StopRecognition();
                     this.Status = SRClientStatus.Idle;
-                }                    
+                }
                 this._sendMessage(WebSocketMessageType.FinalResult, e.Result.Text);
             }
-                
+
         }
 
         private void OnErrorHandler(object sender, RecognitionErrorEventArgs e)
         {
             Console.WriteLine(string.Format(CultureInfo.InvariantCulture, "Speech recognition: Error information: {0} ", e.ToString()));
-            this._factory = null;
+            //            this._factory = null;
+            //            Restart();
             this._sendMessage(WebSocketMessageType.Error, e.FailureReason);
         }
 

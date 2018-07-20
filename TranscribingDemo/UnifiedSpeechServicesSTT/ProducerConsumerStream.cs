@@ -1,6 +1,8 @@
 ﻿// This file is modified from Mischel's answer in stackoverflow
 // https://stackoverflow.com/questions/22047900/ienumerable-to-stream
+
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Threading;
 
@@ -9,57 +11,71 @@ namespace UnifiedSpeechServicesSTT
     // This class is safe for 1 producer and 1 consumer.
     public class ProducerConsumerStream : Stream
     {
-        private byte[] CircleBuff;
-        private int Head;
-        private int Tail;
+        private readonly byte[] _circleBuff;
+        private int _head;
+        private int _tail;
 
         public bool IsAddingCompleted { get; private set; }
         public bool IsCompleted { get; private set; }
 
         // For debugging
-        private long TotalBytesRead = 0;
-        private long TotalBytesWritten = 0;
+        private long _totalBytesRead = 0;
+        private long _totalBytesWritten = 0;
 
         public ProducerConsumerStream(int size)
         {
-            CircleBuff = new byte[size];
-            Head = 1;
-            Tail = 0;
+            _circleBuff = new byte[size];
+            _head = 1;
+            _tail = 0;
         }
 
-//        [Conditional("JIM_DEBUG")]
-        private void DebugOut(string msg)
+        public void Reset()
         {
-//            Console.WriteLine(msg);
+            if (_disposed)
+            {
+                throw new ObjectDisposedException("The stream has been disposed.");
+            }
+            lock (_circleBuff)
+            {
+                _head = 1;
+                _tail = 0;
+                IsAddingCompleted = false;
+                IsCompleted = false;
+            }
         }
 
-        //        [Conditional("JIM_DEBUG")]
-        private void DebugOut(string fmt, params object[] parms)
+        [Conditional("STT_DEBUG")]
+        private static void DebugOut(string msg)
         {
-//            DebugOut(string.Format(fmt, parms));
+            Console.WriteLine(msg);
+        }
+
+        [Conditional("STT_DEBUG")]
+        private static void DebugOut(string fmt, params object[] parms)
+        {
+            DebugOut(string.Format(fmt, parms));
         }
 
         private int ReadBytesAvailable
         {
             get
             {
-                if (Head > Tail)
-                    return Head - Tail - 1;
-                else
-                    return CircleBuff.Length - Tail + Head - 1;
+                if (_head > _tail)
+                    return _head - _tail - 1;
+                return _circleBuff.Length - _tail + _head - 1;
             }
         }
 
-        private int WriteBytesAvailable { get { return CircleBuff.Length - ReadBytesAvailable - 1; } }
+        private int WriteBytesAvailable => _circleBuff.Length - ReadBytesAvailable - 1;
 
         private void IncrementTail()
         {
-            Tail = (Tail + 1) % CircleBuff.Length;
+            _tail = (_tail + 1) % _circleBuff.Length;
         }
 
         public override int Read(byte[] buffer, int offset, int count)
         {
-            if (disposed)
+            if (_disposed)
             {
                 throw new ObjectDisposedException("The stream has been disposed.");
             }
@@ -72,7 +88,7 @@ namespace UnifiedSpeechServicesSTT
                 return 0;
             }
 
-            lock (CircleBuff)
+            lock (_circleBuff)
             {
                 DebugOut("Read: requested {0:N0} bytes. Available = {1:N0}.", count, ReadBytesAvailable);
                 while (ReadBytesAvailable == 0)
@@ -82,7 +98,7 @@ namespace UnifiedSpeechServicesSTT
                         IsCompleted = true;
                         return 0;
                     }
-                    Monitor.Wait(CircleBuff);
+                    Monitor.Wait(_circleBuff);
                 }
 
                 // If Head < Tail, then there are bytes available at the end of the buffer
@@ -90,27 +106,27 @@ namespace UnifiedSpeechServicesSTT
                 // If reading from Tail to the end doesn't fulfill the request,
                 // and there are still bytes available,
                 // then read from the start of the buffer.
-                DebugOut("Read: Head={0}, Tail={1}, Avail={2}", Head, Tail, ReadBytesAvailable);
+                DebugOut("Read: Head={0}, Tail={1}, Avail={2}", _head, _tail, ReadBytesAvailable);
 
                 IncrementTail();
                 int bytesToRead;
-                if (Tail > Head)
+                if (_tail > _head)
                 {
                     // When Tail > Head, we know that there are at least
                     // (CircleBuff.Length - Tail) bytes available in the buffer.
-                    bytesToRead = CircleBuff.Length - Tail;
+                    bytesToRead = _circleBuff.Length - _tail;
                 }
                 else
                 {
-                    bytesToRead = Head - Tail;
+                    bytesToRead = _head - _tail;
                 }
 
                 // Don't read more than count bytes!
                 bytesToRead = Math.Min(bytesToRead, count);
 
-                Buffer.BlockCopy(CircleBuff, Tail, buffer, offset, bytesToRead);
-                Tail += (bytesToRead - 1);
-                int bytesRead = bytesToRead;
+                Buffer.BlockCopy(_circleBuff, _tail, buffer, offset, bytesToRead);
+                _tail += (bytesToRead - 1);
+                var bytesRead = bytesToRead;
 
                 // At this point, either we've exhausted the buffer,
                 // or Tail is at the end of the buffer and has to wrap around.
@@ -119,40 +135,40 @@ namespace UnifiedSpeechServicesSTT
                     // We haven't fulfilled the read.
                     IncrementTail();
                     // Tail is always equal to 0 here.
-                    bytesToRead = Math.Min((count - bytesRead), (Head - Tail));
-                    Buffer.BlockCopy(CircleBuff, Tail, buffer, offset + bytesRead, bytesToRead);
+                    bytesToRead = Math.Min((count - bytesRead), (_head - _tail));
+                    Buffer.BlockCopy(_circleBuff, _tail, buffer, offset + bytesRead, bytesToRead);
                     bytesRead += bytesToRead;
-                    Tail += (bytesToRead - 1);
+                    _tail += (bytesToRead - 1);
                 }
 
-                TotalBytesRead += bytesRead;
-                DebugOut("Read: returning {0:N0} bytes. TotalRead={1:N0}", bytesRead, TotalBytesRead);
-                DebugOut("Read: Head={0}, Tail={1}, Avail={2}", Head, Tail, ReadBytesAvailable);
+                _totalBytesRead += bytesRead;
+                DebugOut("Read: returning {0:N0} bytes. TotalRead={1:N0}", bytesRead, _totalBytesRead);
+                DebugOut("Read: Head={0}, Tail={1}, Avail={2}", _head, _tail, ReadBytesAvailable);
 
-                Monitor.Pulse(CircleBuff);
+                Monitor.Pulse(_circleBuff);
                 return bytesRead;
             }
         }
 
         public void Clear()
         {
-            if (disposed)
+            if (_disposed)
             {
                 throw new ObjectDisposedException("The stream has been disposed.");
             }
             else
             {
-                lock (CircleBuff)
+                lock (_circleBuff)
                 {
-                    Head = 1;
-                    Tail = 0;
+                    _head = 1;
+                    _tail = 0;
                 }
             }
         }
 
         public override void Write(byte[] buffer, int offset, int count)
         {
-            if (disposed)
+            if (_disposed)
             {
                 throw new ObjectDisposedException("The stream has been disposed.");
             }
@@ -160,7 +176,7 @@ namespace UnifiedSpeechServicesSTT
             {
                 throw new InvalidOperationException("The stream has been marked as complete for adding.");
             }
-            lock (CircleBuff)
+            lock (_circleBuff)
             {
                 DebugOut("Write: requested {0:N0} bytes. Available = {1:N0}", count, WriteBytesAvailable);
                 int bytesWritten = 0;
@@ -168,17 +184,16 @@ namespace UnifiedSpeechServicesSTT
                 {
                     while (WriteBytesAvailable == 0)
                     {
-                        Console.WriteLine("buffer full.");
-                        Monitor.Wait(CircleBuff);
+                        Monitor.Wait(_circleBuff);
                     }
-                    DebugOut("Write: Head={0}, Tail={1}, Avail={2}", Head, Tail, WriteBytesAvailable);
+                    DebugOut("Write: Head={0}, Tail={1}, Avail={2}", _head, _tail, WriteBytesAvailable);
                     int bytesToCopy = Math.Min((count - bytesWritten), WriteBytesAvailable);
                     CopyBytes(buffer, offset + bytesWritten, bytesToCopy);
-                    TotalBytesWritten += bytesToCopy;
-                    DebugOut("Write: {0} bytes written. TotalWritten={1:N0}", bytesToCopy, TotalBytesWritten);
-                    DebugOut("Write: Head={0}, Tail={1}, Avail={2}", Head, Tail, WriteBytesAvailable);
+                    _totalBytesWritten += bytesToCopy;
+                    DebugOut("Write: {0} bytes written. TotalWritten={1:N0}", bytesToCopy, _totalBytesWritten);
+                    DebugOut("Write: Head={0}, Tail={1}, Avail={2}", _head, _tail, WriteBytesAvailable);
                     bytesWritten += bytesToCopy;
-                    Monitor.Pulse(CircleBuff);
+                    Monitor.Pulse(_circleBuff);
                 }
             }
         }
@@ -192,52 +207,50 @@ namespace UnifiedSpeechServicesSTT
             // copy as much as can fit between Head and end of the circular buffer
             int offset = srcOffset;
             int bytesCopied = 0;
-            int bytesToCopy = Math.Min(CircleBuff.Length - Head, count);
+            int bytesToCopy = Math.Min(_circleBuff.Length - _head, count);
             if (bytesToCopy > 0)
             {
-                Buffer.BlockCopy(buffer, offset, CircleBuff, Head, bytesToCopy);
+                Buffer.BlockCopy(buffer, offset, _circleBuff, _head, bytesToCopy);
                 bytesCopied = bytesToCopy;
-                Head = (Head + bytesToCopy) % CircleBuff.Length;
+                _head = (_head + bytesToCopy) % _circleBuff.Length;
                 offset += bytesCopied;
             }
 
             // Copy the remainder, which will go from the beginning of the buffer.
-            if (bytesCopied < count)
-            {
-                bytesToCopy = count - bytesCopied;
-                Buffer.BlockCopy(buffer, offset, CircleBuff, Head, bytesToCopy);
-                Head = (Head + bytesToCopy) % CircleBuff.Length;
-            }
+            if (bytesCopied >= count) return;
+            bytesToCopy = count - bytesCopied;
+            Buffer.BlockCopy(buffer, offset, _circleBuff, _head, bytesToCopy);
+            _head = (_head + bytesToCopy) % _circleBuff.Length;
         }
 
         public void CompleteAdding()
         {
-            if (disposed)
+            if (_disposed)
             {
                 throw new ObjectDisposedException("The stream has been disposed.");
             }
-            lock (CircleBuff)
+            lock (_circleBuff)
             {
-                DebugOut("CompleteAdding: {0:N0} bytes written.", TotalBytesWritten);
+                DebugOut("CompleteAdding: {0:N0} bytes written.", _totalBytesWritten);
                 IsAddingCompleted = true;
-                Monitor.Pulse(CircleBuff);
+                Monitor.Pulse(_circleBuff);
             }
         }
 
-        public override bool CanRead { get { return true; } }
+        public override bool CanRead => true;
 
-        public override bool CanSeek { get { return false; } }
+        public override bool CanSeek => false;
 
-        public override bool CanWrite { get { return true; } }
+        public override bool CanWrite => true;
 
         public override void Flush() { /* does nothing */ }
 
-        public override long Length { get { throw new NotImplementedException(); } }
+        public override long Length => throw new NotImplementedException();
 
         public override long Position
         {
-            get { throw new NotImplementedException(); }
-            set { throw new NotImplementedException(); }
+            get => throw new NotImplementedException();
+            set => throw new NotImplementedException();
         }
 
         public override long Seek(long offset, SeekOrigin origin)
@@ -250,15 +263,13 @@ namespace UnifiedSpeechServicesSTT
             throw new NotImplementedException();
         }
 
-        private bool disposed = false;
+        private bool _disposed = false;
 
         protected override void Dispose(bool disposing)
         {
-            if (!disposed)
-            {
-                base.Dispose(disposing);
-                disposed = true;
-            }
+            if (_disposed) return;
+            base.Dispose(disposing);
+            _disposed = true;
         }
     }
 }
