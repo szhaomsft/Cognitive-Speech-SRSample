@@ -9,7 +9,6 @@ import { handleResponse } from './Dispatcher';
 import Recorder from './recorder';
 import AudioWebSocket from './AudioWebSocket';
 
-import VAD from './VAD';
 import { toQueryString } from './utility';
 
 const RECORDING = 'recording';
@@ -138,8 +137,6 @@ export default class AssistantInput extends React.Component {
       }
     };
 
-    // Create VAD
-    this.vad = new VAD(options);
     this.audioSource.oninactive = () => {
       navigator.getUserMedia({
         audio: true
@@ -161,6 +158,7 @@ export default class AssistantInput extends React.Component {
 
     this.audioRecorder = new Recorder(inputPoint);
     AudioWebSocket.set_recorder(this.audioRecorder);
+    this.audioRecorder.record(AudioWebSocket);
     console.log(this.state.recorderState);
     if (this.state.recorderState===DUPLEX){
       AudioWebSocket.send("[sr]begin-duplex");

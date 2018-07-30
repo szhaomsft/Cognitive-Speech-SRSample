@@ -1,5 +1,8 @@
 dist/assets
 
+# package-lock.json
+package-lock.json
+
 # Logs
 logs
 *.log

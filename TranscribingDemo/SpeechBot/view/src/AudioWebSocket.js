@@ -9,13 +9,15 @@ var l_ws_service_path;
 var l_config;
 var l_audio_recoder;
 
+var buffer = [];
+
 import { toQueryString } from './utility';
 
 function connect(cb, wsServicePath = 'speech' , config = {}) {
   try {
     let wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     if (!websocket || websocket.readyState !== websocket.OPEN) {
-      var uri = `${wsProtocol}//${window.location.hostname}${window.location.port ? ':' + window.location.port : ''}/${wsServicePath}`;
+      var uri = `${wsProtocol}//${window.location.host}${window.location.pathname.substring(0,location.href.lastIndexOf('/'))}${wsServicePath}`;
       if (window.location.search.indexOf('mooncakesr') >= 0) {
         uri = `${wsProtocol}//${window.location.hostname}${window.location.port ? ':' + window.location.port : ''}/sr`;
       }
@@ -41,7 +43,7 @@ export default {
     l_error_cb = error_cb;
     l_ws_service_path = wsServicePath;
     l_config = config;
-    console.log('websocket handler set.' + wsServicePath);
+    console.log('websocket handler set. path: ./' + wsServicePath);
     if (websocket != null && websocket.readyState === websocket.OPEN)
     {
       websocket.onerror = function (event) {
@@ -56,8 +58,6 @@ export default {
         if (data == null || data.length <= 0) {
           return;
         }
-
-        // console.log(data);
         l_message_cb(this, data);
       };
 
@@ -97,7 +97,6 @@ export default {
         console.log('WS opened ' + performance.now());
         l_open_cb();
         execute_cb(this);
-        // l_audio_recoder.sendHeader(websocket);
         l_audio_recoder.record(websocket);
       }, l_ws_service_path, l_config);
 
@@ -114,7 +113,6 @@ export default {
           return;
         }
 
-        // console.log(data);
         l_message_cb(this, data);
       };
 
@@ -128,9 +126,46 @@ export default {
   },
 
   send: function(mes){
-    this.execute((a) => {
-      websocket.send(mes);
-    })
+    if (websocket && websocket.readyState === websocket.OPEN) {
+      websocket.send(mes)
+    }
+    else if (websocket && websocket.readyState === websocket.CONNECTING) {
+      buffer.push(mes);
+      console.log("buffer pushed: " + mes);
+    }
+    else {
+      buffer.push(mes);
+      connect(() => {
+        console.log('WS opened ' + performance.now());
+        l_open_cb();
+        while (buffer.length > 0) {
+          console.log("sending buffer: " + buffer[0]);
+          websocket.send(buffer.shift())
+        }
+      }, l_ws_service_path, l_config);
+
+      websocket.onerror = function (event) {
+        if (l_error_cb) {
+          l_error_cb(this, event);
+        }
+      };
+      console.log("websocket established or re-established.");
+      websocket.onmessage = function (event) {
+        console.log('WS onmessage ' + performance.now());
+        var data = event.data;
+        if (data == null || data.length <= 0) {
+          return;
+        }
+        l_message_cb(this, data);
+      };
+
+      websocket.onclose = function (event) {
+        console.log('WS closed ' + performance.now());
+        // stopRecording();
+        l_close_cb(this, event);
+        websocket = null;
+      };
+    }
   },
 
   stop: function () {

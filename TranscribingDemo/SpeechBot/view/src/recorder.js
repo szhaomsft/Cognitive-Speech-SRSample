@@ -39,8 +39,7 @@ var Recorder = function (source) {
     var index = 0,
       inputIndex = 0;
 
-    while (index < length) {
-      result[index++] = inputL[inputIndex];
+    while (index < length) {      result[index++] = inputL[inputIndex];
       inputIndex += 3;
     }
 
